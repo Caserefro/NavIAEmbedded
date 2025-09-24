@@ -2,35 +2,35 @@
 #define MOTOR_MODULE_MAIN_H
 
 #include <HardwareSerial.h>
+#include <Wire.h>
 
 HardwareSerial SystemUART(1);  // UART1
-const int SystemUARTRX = 7;
-const int SystemUARTTX = 8;
+const int SystemUARTRX = 21; //7;
+const int SystemUARTTX = 20; //8;
 #define DEVICE_ID "1"
 
-#define IR_STOP_FRONT_PIN 0
-#define IR_STOP_SIDE_PIN 1
-volatile bool IR_STOP_FRONT_Flag = false, IR_STOP_SIDE_Flag = false;
-volatile unsigned long IR_STOP_FRONT_Time = 0, IR_STOP_SIDE_Time = 0;
-volatile unsigned long Last_IR_STOP_FRONT_Time = 0, Last_IR_STOP_SIDE_Time = 0;
-
-#define C1_ENCODER_PIN 20
-#define C2_ENCODER_PIN 21
+// Pins and PWM channels
+#define RPWM_PIN 5
+#define LPWM_PIN 7
+#define RPWM_CHANNEL 0
+#define LPWM_CHANNEL 1
 
 
-static TaskHandle_t Speed_Calculation_Task = NULL;
+
+static TaskHandle_t EncoderReading_Task = NULL;
 static TaskHandle_t Motor_Task = NULL;
-static TaskHandle_t Displacement_Task = NULL;
 
 hw_timer_t* timer = NULL;
 uint8_t timer_id = 0;
 uint16_t prescaler = 80;  // Between 0 and 65 535
 int threshold = 50000;    // 64 bits value (limited to int size of 32bits) -- Set to 100ms
 
-volatile uint8_t last_encoder_state = 0;
-volatile int encoder_ticks = 0;  // Updated in ISR
-int last_encoder_ticks = 0;
-unsigned long last_time = 0;
+const uint8_t AS5600_ADDR = 0x36;
+const uint8_t ANGLE_MSB = 0x0E; // MSB register
+const uint8_t ANGLE_LSB = 0x0F; // LSB register
+long totalTurns = 0;
+int16_t lastAngle = -1;
+
 
 portMUX_TYPE mux = portMUX_INITIALIZER_UNLOCKED;
 portMUX_TYPE motorMux = portMUX_INITIALIZER_UNLOCKED;
@@ -60,9 +60,10 @@ double displacementKp = 2.0, displacementKi = 0.5, displacementKd = 0.1;
 double displacement_integral = 0, last_displacement_error = 0;
 double target_position = 0;  // In encoder ticks, or convert to radians
 
+// forward declarations for ISRs (must exist before timerAttachInterrupt)
+void IRAM_ATTR encoderISRTimer();
+void IRAM_ATTR MotorTaskTimer();
 
-void IRAM_ATTR timer_isr();
-void IRAM_ATTR encoderISR();
 void TimerTask(void* parameters);
 
 void UART_SEND(String message);

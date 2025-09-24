@@ -292,7 +292,7 @@ void checkSystemUART() {//Bottom RIGHT
   }
 }
 */
-
+/*
 void checkSystemUART() {
   if (SystemUART.available()) {
     String command = readUARTLine(SystemUART);
@@ -383,5 +383,5 @@ void checkSystemUART() {
   }
 }
 
-
+*/
 #endif
