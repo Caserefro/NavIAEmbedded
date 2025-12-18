@@ -26,7 +26,7 @@ async def receive_messages(websocket):
         print(f"Unexpected receive error: {e}")
 
 async def main():
-    uri = "ws://192.168.1.81:8000"
+    uri = "ws://10.24.0.173"
     try:
         async with websockets.connect(uri) as websocket:
             print(f"Connected to {uri}")

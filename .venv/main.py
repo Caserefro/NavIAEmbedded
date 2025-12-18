@@ -3,13 +3,14 @@ import websockets
 import serial
 from threading import Thread
 from functools import partial
-
+from MecanumControl import *
+import json
 #this is the code running in the RPi. the test file is for testing how to give commands to the rpi.
 class UARTManager:
     def __init__(self):
         self.uart_ports = {
+            'UART0': {'device': '/dev/ttyAMA0', 'baudrate': 115200, 'timeout': 1},
             'UART2': {'device': '/dev/ttyAMA2', 'baudrate': 115200, 'timeout': 1},
-            'UART3': {'device': '/dev/ttyAMA3', 'baudrate': 115200, 'timeout': 1},
             'UART4': {'device': '/dev/ttyAMA4', 'baudrate': 115200, 'timeout': 1}
         }
         self.serial_connections = {}
@@ -70,21 +71,48 @@ class UARTManager:
             if conn: conn.close()
         print("UART ports closed")
 
-
 async def websocket_handler(websocket, uart_manager):
     try:
         async for message in websocket:
             print(f"Received command: {message}")
-            uart_manager.write_to_port('UART4', message)
+
+            # Expected JSON: {"mode": "P", "x":1.0, "y":0.5, "theta":1.57}
+            data = json.loads(message)
+            mode = data.get("mode", "P")  # default "P" = position
+            x_goal = float(data["x"])
+            y_goal = float(data["y"])
+            theta_goal = float(data["theta"])
+
+            # Example: robot starts at origin facing 0 rad
+            x_curr, y_curr, theta_curr = 0.0, 0.0, 0.0
+
+            # Robot geometry (tune these for your robot)
+            r, L, W = 0.0485, 0.15, 0.12
+
+            wheels = mecanum_to_pose(
+                x_curr, y_curr, theta_curr,
+                x_goal, y_goal, theta_goal,
+                r, L, W
+            )
+
+            # Format UART message in radians
+            serial_msg = f"{mode},{wheels.m1:.4f},{wheels.m2:.4f},{wheels.m3:.4f},{wheels.m4:.4f}"
+            print(f"Sending to UART: {serial_msg}")
+
+            uart_manager.write_to_port('UART0', serial_msg)
+
     except websockets.exceptions.ConnectionClosedError as e:
         print(f"Client disconnected: {e}")
     except Exception as e:
         print(f"WebSocket error: {str(e)}")
 
-
 async def main():
     uart_manager = UARTManager()
     uart_manager.start()
+
+    # send a test command on UART0 and UART4
+    uart_manager.write_to_port('UART0', "test0")
+    uart_manager.write_to_port('UART4', "test4")
 
     try:
         async def handler(websocket):
